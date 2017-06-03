@@ -1,4 +1,4 @@
-FROM alpine:3.6
+FROM golang:alpine3.6 as builder
 
 MAINTAINER David Anderson <dave@natulte.net>
 
@@ -7,14 +7,11 @@ ARG PIXIECORE_CONTEXT="$PIXIECORE_SANDBOX"/context
 
 COPY . "$PIXIECORE_CONTEXT"
 
-RUN set -x;                                                                     \
-    set -e;                                                                     \
+RUN set -uxe;                                                                   \
                                                                                 \
     apk upgrade --update-cache;                                                 \
-    apk add ca-certificates;                                                    \
     apk add --virtual .build-deps                                               \
         git                                                                     \
-        go                                                                      \
         glide                                                                   \
         musl-dev;                                                               \
                                                                                 \
@@ -42,9 +39,14 @@ RUN set -x;                                                                     
     cd "$REPO_PATH";                                                            \
     glide install;                                                              \
     go test $(glide nv);                                                        \
-    GOBIN=/usr/local/bin go install -ldflags -s ./"$PKG";                       \
-                                                                                \
-    apk del --purge .build-deps;                                                \
-    rm -rf "$PIXIECORE_SANDBOX" /var/cache/apk/*;
+    GOBIN=/ go install -ldflags -s ./"$PKG";
+
+FROM alpine:3.6
+
+RUN apk upgrade --update-cache;                                                 \
+    apk add ca-certificates;                                                    \
+    rm -rf /var/cache/apk/*;
+
+COPY --from=builder /pixiecore /usr/local/bin
 
 ENTRYPOINT ["/usr/local/bin/pixiecore"]
